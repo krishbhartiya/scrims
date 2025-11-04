@@ -1,4 +1,5 @@
 // Mock data for Twitch streams and categories
+import { twitchAPI, TwitchStream as TwitchAPIStream, TwitchGame } from './twitchApi';
 
 export interface Stream {
   id: string;
@@ -10,6 +11,7 @@ export interface Stream {
   thumbnail: string;
   isLive: boolean;
   tags?: string[];
+  userLogin?: string; // Add user login for proper stream linking
 }
 
 export interface Category {
@@ -69,6 +71,7 @@ export const mockStreams: Stream[] = [
     thumbnail: 'https://static-cdn.jtvnw.net/previews-ttv/live_user_tenz-440x248.jpg',
     isLive: true,
     tags: ['English', 'FPS', 'Pro Player'],
+    userLogin: 'tenz',
   },
   {
     id: '2',
@@ -80,6 +83,7 @@ export const mockStreams: Stream[] = [
     thumbnail: 'https://static-cdn.jtvnw.net/previews-ttv/live_user_pokimane-440x248.jpg',
     isLive: true,
     tags: ['English', 'Variety'],
+    userLogin: 'pokimane',
   },
   {
     id: '3',
@@ -91,6 +95,7 @@ export const mockStreams: Stream[] = [
     thumbnail: 'https://static-cdn.jtvnw.net/previews-ttv/live_user_faker-440x248.jpg',
     isLive: true,
     tags: ['Korean', 'Pro Player', 'MOBA'],
+    userLogin: 'faker',
   },
   {
     id: '4',
@@ -102,6 +107,7 @@ export const mockStreams: Stream[] = [
     thumbnail: 'https://static-cdn.jtvnw.net/previews-ttv/live_user_dream-440x248.jpg',
     isLive: true,
     tags: ['English', 'Survival', 'Speedrun'],
+    userLogin: 'dream',
   },
   {
     id: '5',
@@ -113,6 +119,7 @@ export const mockStreams: Stream[] = [
     thumbnail: 'https://static-cdn.jtvnw.net/previews-ttv/live_user_s1mple-440x248.jpg',
     isLive: true,
     tags: ['English', 'FPS', 'Pro Player'],
+    userLogin: 's1mple',
   },
   {
     id: '6',
@@ -124,6 +131,7 @@ export const mockStreams: Stream[] = [
     thumbnail: 'https://static-cdn.jtvnw.net/previews-ttv/live_user_ninja-440x248.jpg',
     isLive: true,
     tags: ['English', 'Battle Royale'],
+    userLogin: 'ninja',
   },
   {
     id: '7',
@@ -135,6 +143,7 @@ export const mockStreams: Stream[] = [
     thumbnail: 'https://static-cdn.jtvnw.net/previews-ttv/live_user_doublelift-440x248.jpg',
     isLive: true,
     tags: ['English', 'MOBA', 'Educational'],
+    userLogin: 'doublelift',
   },
   {
     id: '8',
@@ -146,37 +155,154 @@ export const mockStreams: Stream[] = [
     thumbnail: 'https://static-cdn.jtvnw.net/previews-ttv/live_user_shroud-440x248.jpg',
     isLive: true,
     tags: ['English', 'FPS', 'Educational'],
+    userLogin: 'shroud',
   },
 ];
 
+// Convert Twitch API stream to our Stream format
+const convertTwitchStream = (twitchStream: TwitchAPIStream): Stream => ({
+  id: twitchStream.user_id,
+  title: twitchStream.title,
+  streamerName: twitchStream.user_name,
+  streamerAvatar: `https://static-cdn.jtvnw.net/jtv_user_pictures/${twitchStream.user_login}-profile_image-70x70.png`,
+  game: twitchStream.game_name,
+  viewers: twitchStream.viewer_count,
+  thumbnail: twitchAPI.formatThumbnailUrl(twitchStream.thumbnail_url),
+  isLive: twitchStream.type === 'live',
+  tags: twitchStream.tags || [],
+  userLogin: twitchStream.user_login,
+});
+
+// Convert Twitch API game to our Category format
+const convertTwitchGame = (twitchGame: TwitchGame, viewerCount: number = 0): Category => ({
+  id: twitchGame.id,
+  name: twitchGame.name,
+  thumbnail: twitchAPI.formatBoxArtUrl(twitchGame.box_art_url),
+  viewers: viewerCount,
+});
+
+// Get live streams from Twitch API
+export const getLiveStreams = async (limit: number = 20): Promise<Stream[]> => {
+  try {
+    const twitchStreams = await twitchAPI.getTopStreams(limit);
+    return twitchStreams.map(convertTwitchStream);
+  } catch (error) {
+    console.error('Error fetching live streams:', error);
+    return mockStreams; // Fallback to mock data
+  }
+};
+
+// Get top categories from Twitch API
+export const getTopCategories = async (limit: number = 20): Promise<Category[]> => {
+  try {
+    const twitchGames = await twitchAPI.getTopGames(limit);
+    return twitchGames.map((game, index) => 
+      convertTwitchGame(game, 100000 - (index * 5000))
+    );
+  } catch (error) {
+    console.error('Error fetching top categories:', error);
+    return mockCategories; // Fallback to mock data
+  }
+};
+
 // Featured stream for hero section
-export const featuredStream = mockStreams[2]; // Faker's stream
-
-// Mock function to get streams by category
-export const getStreamsByCategory = (categoryName: string): Stream[] => {
-  return mockStreams.filter(stream => 
-    stream.game.toLowerCase().includes(categoryName.toLowerCase())
-  );
+export const getFeaturedStream = async (): Promise<Stream> => {
+  try {
+    const streams = await getLiveStreams(1);
+    return streams[0] || mockStreams[0];
+  } catch (error) {
+    return mockStreams[2]; // Fallback to mock featured stream
+  }
 };
 
-// Mock function to search streams
-export const searchStreams = (query: string): Stream[] => {
-  const lowerQuery = query.toLowerCase();
-  return mockStreams.filter(stream =>
-    stream.title.toLowerCase().includes(lowerQuery) ||
-    stream.streamerName.toLowerCase().includes(lowerQuery) ||
-    stream.game.toLowerCase().includes(lowerQuery)
-  );
+export const featuredStream = mockStreams[2]; // Faker's stream (for initial render)
+
+// Get streams by category
+export const getStreamsByCategory = async (categoryName: string, limit: number = 20): Promise<Stream[]> => {
+  try {
+    // First, search for the game to get its ID
+    const games = await twitchAPI.getTopGames(100);
+    const game = games.find(g => g.name.toLowerCase().includes(categoryName.toLowerCase()));
+    
+    if (game) {
+      const twitchStreams = await twitchAPI.getStreamsByGame(game.id, limit);
+      return twitchStreams.map(convertTwitchStream);
+    }
+    
+    // Fallback to mock data
+    return mockStreams.filter(stream => 
+      stream.game.toLowerCase().includes(categoryName.toLowerCase())
+    );
+  } catch (error) {
+    console.error('Error fetching streams by category:', error);
+    return mockStreams.filter(stream => 
+      stream.game.toLowerCase().includes(categoryName.toLowerCase())
+    );
+  }
 };
 
-// Mock function to get stream by ID
-export const getStreamById = (id: string): Stream | undefined => {
-  return mockStreams.find(stream => stream.id === id);
+// Search streams
+export const searchStreams = async (query: string, limit: number = 20): Promise<Stream[]> => {
+  try {
+    const results = await twitchAPI.searchChannels(query, limit);
+    // Convert search results to Stream format
+    const streams: Stream[] = results.map((channel: any) => ({
+      id: channel.id,
+      title: channel.title || `${channel.display_name}'s stream`,
+      streamerName: channel.display_name,
+      streamerAvatar: channel.thumbnail_url || `https://static-cdn.jtvnw.net/jtv_user_pictures/${channel.broadcaster_login}-profile_image-70x70.png`,
+      game: channel.game_name || 'No Category',
+      viewers: 0,
+      thumbnail: channel.thumbnail_url || '',
+      isLive: channel.is_live,
+      tags: channel.tags || [],
+      userLogin: channel.broadcaster_login,
+    }));
+    return streams;
+  } catch (error) {
+    console.error('Error searching streams:', error);
+    // Fallback to mock search
+    const lowerQuery = query.toLowerCase();
+    return mockStreams.filter(stream =>
+      stream.title.toLowerCase().includes(lowerQuery) ||
+      stream.streamerName.toLowerCase().includes(lowerQuery) ||
+      stream.game.toLowerCase().includes(lowerQuery)
+    );
+  }
 };
 
-// Mock function to get related streams
-export const getRelatedStreams = (currentStreamId: string, game: string): Stream[] => {
-  return mockStreams
-    .filter(stream => stream.id !== currentStreamId && stream.game === game)
-    .slice(0, 4);
+// Get stream by ID or username
+export const getStreamById = async (id: string): Promise<Stream | undefined> => {
+  try {
+    // Try to get stream by ID from Twitch API
+    const stream = await twitchAPI.getStreamById(id);
+    if (stream) {
+      return convertTwitchStream(stream);
+    }
+    
+    // If numeric ID fails, try as username
+    const streamByUsername = await twitchAPI.getStreamByUsername(id);
+    if (streamByUsername) {
+      return convertTwitchStream(streamByUsername);
+    }
+    
+    // Fallback to mock data
+    return mockStreams.find(stream => stream.id === id);
+  } catch (error) {
+    console.error('Error fetching stream by ID:', error);
+    return mockStreams.find(stream => stream.id === id);
+  }
+};
+
+// Get related streams
+export const getRelatedStreams = async (currentStreamId: string, game: string, limit: number = 4): Promise<Stream[]> => {
+  try {
+    const streams = await getStreamsByCategory(game, limit + 1);
+    return streams.filter(stream => stream.id !== currentStreamId).slice(0, limit);
+  } catch (error) {
+    console.error('Error fetching related streams:', error);
+    return mockStreams
+      .filter(stream => stream.id !== currentStreamId && stream.game === game)
+      .slice(0, limit);
+  }
 };

@@ -1,65 +1,80 @@
 'use client';
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import SearchBar from '@/components/SearchBar';
 import StreamGrid from '@/components/StreamGrid';
 import LoadingSkeleton from '@/components/LoadingSkeleton';
-import { mockStreams, mockCategories, searchStreams, getStreamsByCategory } from '@/lib/mockData';
+import { getLiveStreams, getTopCategories, searchStreams, getStreamsByCategory, Stream, Category } from '@/lib/mockData';
 
 export default function BrowsePage() {
-  const [filteredStreams, setFilteredStreams] = useState(mockStreams);
+  const [streams, setStreams] = useState<Stream[]>([]);
+  const [categories, setCategories] = useState<Category[]>([]);
+  const [filteredStreams, setFilteredStreams] = useState<Stream[]>([]);
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
   const [searchQuery, setSearchQuery] = useState('');
-  const [isLoading, setIsLoading] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
 
-  const handleSearch = useCallback((query: string) => {
+  // Load initial data
+  useEffect(() => {
+    const loadData = async () => {
+      setIsLoading(true);
+      const [fetchedStreams, fetchedCategories] = await Promise.all([
+        getLiveStreams(50),
+        getTopCategories(10)
+      ]);
+      setStreams(fetchedStreams);
+      setCategories(fetchedCategories);
+      setFilteredStreams(fetchedStreams);
+      setIsLoading(false);
+    };
+    loadData();
+  }, []);
+
+  const handleSearch = useCallback(async (query: string) => {
     setIsLoading(true);
     setSearchQuery(query);
     
-    // Simulate API delay
-    setTimeout(() => {
-      if (query.trim() === '') {
-        if (selectedCategory === 'all') {
-          setFilteredStreams(mockStreams);
-        } else {
-          setFilteredStreams(getStreamsByCategory(selectedCategory));
-        }
+    if (query.trim() === '') {
+      if (selectedCategory === 'all') {
+        setFilteredStreams(streams);
       } else {
-        const results = searchStreams(query);
-        if (selectedCategory !== 'all') {
-          setFilteredStreams(results.filter(s => s.game === selectedCategory));
-        } else {
-          setFilteredStreams(results);
-        }
+        const categoryStreams = await getStreamsByCategory(selectedCategory, 50);
+        setFilteredStreams(categoryStreams);
       }
-      setIsLoading(false);
-    }, 300);
-  }, [selectedCategory]);
+    } else {
+      const results = await searchStreams(query, 50);
+      if (selectedCategory !== 'all') {
+        setFilteredStreams(results.filter(s => s.game === selectedCategory));
+      } else {
+        setFilteredStreams(results);
+      }
+    }
+    setIsLoading(false);
+  }, [selectedCategory, streams]);
 
-  const handleCategoryChange = (category: string) => {
+  const handleCategoryChange = async (category: string) => {
     setIsLoading(true);
     setSelectedCategory(category);
     
-    setTimeout(() => {
-      if (category === 'all') {
-        if (searchQuery) {
-          setFilteredStreams(searchStreams(searchQuery));
-        } else {
-          setFilteredStreams(mockStreams);
-        }
+    if (category === 'all') {
+      if (searchQuery) {
+        const results = await searchStreams(searchQuery, 50);
+        setFilteredStreams(results);
       } else {
-        const categoryStreams = getStreamsByCategory(category);
-        if (searchQuery) {
-          setFilteredStreams(categoryStreams.filter(s => 
-            s.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-            s.streamerName.toLowerCase().includes(searchQuery.toLowerCase())
-          ));
-        } else {
-          setFilteredStreams(categoryStreams);
-        }
+        setFilteredStreams(streams);
       }
-      setIsLoading(false);
-    }, 300);
+    } else {
+      const categoryStreams = await getStreamsByCategory(category, 50);
+      if (searchQuery) {
+        setFilteredStreams(categoryStreams.filter(s => 
+          s.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+          s.streamerName.toLowerCase().includes(searchQuery.toLowerCase())
+        ));
+      } else {
+        setFilteredStreams(categoryStreams);
+      }
+    }
+    setIsLoading(false);
   };
 
   return (
@@ -89,7 +104,7 @@ export default function BrowsePage() {
             >
               All Categories
             </button>
-            {mockCategories.map((category) => (
+            {categories.map((category) => (
               <button
                 key={category.id}
                 onClick={() => handleCategoryChange(category.name)}

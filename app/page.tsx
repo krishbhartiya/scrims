@@ -1,9 +1,13 @@
 import Link from 'next/link';
 import StreamGrid from '@/components/StreamGrid';
 import CategoryCarousel from '@/components/CategoryCarousel';
-import { mockStreams, mockCategories, featuredStream } from '@/lib/mockData';
+import { getLiveStreams, getTopCategories, getFeaturedStream } from '@/lib/mockData';
 
-export default function Home() {
+export default async function Home() {
+  // Fetch real Twitch data
+  const streams = await getLiveStreams(20);
+  const categories = await getTopCategories(10);
+  const featuredStream = await getFeaturedStream();
   return (
     <div className="min-h-screen">
       {/* Hero Section - Featured Stream */}
@@ -76,7 +80,7 @@ export default function Home() {
             </svg>
           </Link>
         </div>
-        <CategoryCarousel categories={mockCategories} />
+        <CategoryCarousel categories={categories} />
       </section>
 
       {/* Top Live Streams */}
@@ -96,7 +100,7 @@ export default function Home() {
             </svg>
           </Link>
         </div>
-        <StreamGrid streams={mockStreams} />
+        <StreamGrid streams={streams} />
       </section>
     </div>
   );

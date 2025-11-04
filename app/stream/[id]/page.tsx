@@ -1,18 +1,49 @@
 'use client';
 
 import { useParams } from 'next/navigation';
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import StreamPlayer from '@/components/StreamPlayer';
 import ChatBox from '@/components/ChatBox';
 import StreamCard from '@/components/StreamCard';
-import { getStreamById, getRelatedStreams } from '@/lib/mockData';
+import { getStreamById, getRelatedStreams, Stream } from '@/lib/mockData';
 import { useFavorites } from '@/hooks/useFavorites';
 
 export default function StreamPage() {
   const params = useParams();
   const streamId = params.id as string;
-  const stream = getStreamById(streamId);
+  const [stream, setStream] = useState<Stream | null>(null);
+  const [relatedStreams, setRelatedStreams] = useState<Stream[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
   const { isFavorite, toggleFavorite } = useFavorites();
+
+  useEffect(() => {
+    const loadStreamData = async () => {
+      setIsLoading(true);
+      const streamData = await getStreamById(streamId);
+      setStream(streamData || null);
+      
+      if (streamData) {
+        const related = await getRelatedStreams(streamId, streamData.game, 4);
+        setRelatedStreams(related);
+      }
+      
+      setIsLoading(false);
+    };
+    
+    loadStreamData();
+  }, [streamId]);
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-16 w-16 border-t-2 border-b-2 border-[#9146FF] mx-auto mb-4"></div>
+          <p className="text-[#ADADAD]">Loading stream...</p>
+        </div>
+      </div>
+    );
+  }
 
   if (!stream) {
     return (
@@ -34,7 +65,6 @@ export default function StreamPage() {
     );
   }
 
-  const relatedStreams = getRelatedStreams(streamId, stream.game);
   const isFav = isFavorite(streamId);
 
   const handleFavoriteClick = () => {
@@ -61,7 +91,7 @@ export default function StreamPage() {
             {/* Video Player */}
             <StreamPlayer 
               streamId={stream.id} 
-              channel={stream.streamerName.toLowerCase().replace(/\s+/g, '')} 
+              channel={stream.userLogin || stream.streamerName.toLowerCase().replace(/\s+/g, '')} 
             />
 
             {/* Stream Info */}
@@ -159,7 +189,7 @@ export default function StreamPage() {
 
           {/* Chat Sidebar */}
           <div className="w-full lg:w-[340px] xl:w-[400px] h-[600px] lg:h-auto lg:sticky lg:top-20">
-            <ChatBox channel={stream.streamerName.toLowerCase().replace(/\s+/g, '')} />
+            <ChatBox channel={stream.userLogin || stream.streamerName.toLowerCase().replace(/\s+/g, '')} />
           </div>
         </div>
       </div>
