@@ -2,9 +2,22 @@
 
 import Link from 'next/link';
 import { useState } from 'react';
+import { useAuth } from '@/hooks/useAuth';
+import { signOut } from '@/lib/firebaseAuth';
 
 export default function Navbar() {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const [showUserMenu, setShowUserMenu] = useState(false);
+  const { user, loading } = useAuth();
+
+  const handleLogout = async () => {
+    try {
+      await signOut();
+      setShowUserMenu(false);
+    } catch (error) {
+      console.error('Logout error:', error);
+    }
+  };
 
   return (
     <nav className="sticky top-0 z-50 bg-[#18181B]/95 backdrop-blur-lg border-b border-[#2D2D31] shadow-lg">
@@ -34,14 +47,58 @@ export default function Navbar() {
             </Link>
           </div>
 
-          {/* Auth Button */}
+          {/* Auth Section */}
           <div className="hidden md:flex items-center space-x-4">
-            <Link 
-              href="/auth/login"
-              className="px-6 py-2.5 bg-[#9146FF] text-white rounded-lg font-semibold hover:bg-[#7d3cd6] transition-all hover:scale-105 hover:shadow-lg hover:shadow-[#9146FF]/30"
-            >
-              Login
-            </Link>
+            {loading ? (
+              <div className="w-8 h-8 rounded-full bg-[#2D2D31] animate-pulse"></div>
+            ) : user ? (
+              <div className="relative">
+                <button
+                  onClick={() => setShowUserMenu(!showUserMenu)}
+                  className="flex items-center space-x-3 px-3 py-2 rounded-lg hover:bg-[#2D2D31] transition-colors"
+                >
+                  <div className="w-8 h-8 rounded-full bg-gradient-to-br from-[#9146FF] to-[#7d3cd6] flex items-center justify-center text-white font-semibold">
+                    {user.displayName?.[0]?.toUpperCase() || user.email?.[0]?.toUpperCase() || 'U'}
+                  </div>
+                  <span className="text-white font-medium">{user.displayName || user.email?.split('@')[0]}</span>
+                  <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                  </svg>
+                </button>
+                {showUserMenu && (
+                  <div className="absolute right-0 mt-2 w-48 bg-[#18181B] border border-[#2D2D31] rounded-lg shadow-xl py-1 z-50">
+                    <Link
+                      href="/profile"
+                      className="block px-4 py-2 text-white hover:bg-[#2D2D31] transition-colors"
+                      onClick={() => setShowUserMenu(false)}
+                    >
+                      Profile
+                    </Link>
+                    <button
+                      onClick={handleLogout}
+                      className="w-full text-left px-4 py-2 text-red-400 hover:bg-[#2D2D31] transition-colors"
+                    >
+                      Logout
+                    </button>
+                  </div>
+                )}
+              </div>
+            ) : (
+              <>
+                <Link 
+                  href="/auth/login"
+                  className="px-4 py-2 text-white hover:text-[#9146FF] transition-colors font-medium"
+                >
+                  Login
+                </Link>
+                <Link 
+                  href="/auth/signup"
+                  className="px-6 py-2.5 bg-[#9146FF] text-white rounded-lg font-semibold hover:bg-[#7d3cd6] transition-all hover:scale-105 hover:shadow-lg hover:shadow-[#9146FF]/30"
+                >
+                  Sign Up
+                </Link>
+              </>
+            )}
           </div>
 
           {/* Mobile Menu Button */}
@@ -100,13 +157,51 @@ export default function Navbar() {
               >
                 Profile
               </Link>
-              <Link
-                href="/auth/login"
-                className="px-4 py-2.5 bg-[#9146FF] text-white rounded-lg font-semibold hover:bg-[#7d3cd6] transition-all text-center mt-2"
-                onClick={() => setIsMenuOpen(false)}
-              >
-                Login
-              </Link>
+              {loading ? (
+                <div className="px-3 py-2.5">
+                  <div className="h-10 bg-[#2D2D31] rounded-lg animate-pulse"></div>
+                </div>
+              ) : user ? (
+                <>
+                  <div className="px-3 py-2.5 border-t border-[#2D2D31] mt-2">
+                    <div className="flex items-center space-x-3 mb-2">
+                      <div className="w-10 h-10 rounded-full bg-gradient-to-br from-[#9146FF] to-[#7d3cd6] flex items-center justify-center text-white font-semibold">
+                        {user.displayName?.[0]?.toUpperCase() || user.email?.[0]?.toUpperCase() || 'U'}
+                      </div>
+                      <div>
+                        <p className="text-white font-medium">{user.displayName || user.email?.split('@')[0]}</p>
+                        <p className="text-[#ADADAD] text-sm">{user.email}</p>
+                      </div>
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => {
+                      handleLogout();
+                      setIsMenuOpen(false);
+                    }}
+                    className="px-4 py-2.5 bg-red-500 text-white rounded-lg font-semibold hover:bg-red-600 transition-all text-center"
+                  >
+                    Logout
+                  </button>
+                </>
+              ) : (
+                <>
+                  <Link
+                    href="/auth/login"
+                    className="px-4 py-2.5 bg-[#2D2D31] text-white rounded-lg font-semibold hover:bg-[#3D3D41] transition-all text-center mt-2"
+                    onClick={() => setIsMenuOpen(false)}
+                  >
+                    Login
+                  </Link>
+                  <Link
+                    href="/auth/signup"
+                    className="px-4 py-2.5 bg-[#9146FF] text-white rounded-lg font-semibold hover:bg-[#7d3cd6] transition-all text-center"
+                    onClick={() => setIsMenuOpen(false)}
+                  >
+                    Sign Up
+                  </Link>
+                </>
+              )}
             </div>
           </div>
         )}
