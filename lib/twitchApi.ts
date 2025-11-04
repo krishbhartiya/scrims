@@ -53,10 +53,28 @@ class TwitchAPI {
   constructor() {
     this.clientId = process.env.NEXT_PUBLIC_TWITCH_CLIENT_ID || '';
     this.clientSecret = process.env.TWITCH_CLIENT_SECRET || '';
+    
+    // Only log once on initialization if credentials are missing
+    if (!this.clientId || !this.clientSecret) {
+      if (typeof window === 'undefined') {
+        // Only log on server-side to avoid console spam
+        console.info('Twitch API credentials not configured. Using mock data fallback.');
+      }
+    }
+  }
+
+  // Check if API is properly configured
+  private isConfigured(): boolean {
+    return !!(this.clientId && this.clientSecret && this.clientId.length > 10 && this.clientSecret.length > 10);
   }
 
   // Get OAuth access token
   private async getAccessToken(): Promise<string> {
+    // Check if API is configured
+    if (!this.isConfigured()) {
+      throw new Error('Twitch API credentials not configured');
+    }
+
     // Check if we have a valid token
     if (this.accessToken && Date.now() < this.tokenExpiry) {
       return this.accessToken;
@@ -76,7 +94,9 @@ class TwitchAPI {
       });
 
       if (!response.ok) {
-        throw new Error('Failed to get Twitch access token');
+        const errorText = await response.text();
+        console.error('Twitch OAuth error:', errorText);
+        throw new Error(`Failed to get Twitch access token: ${response.status}`);
       }
 
       const data: TwitchAccessToken = await response.json();
@@ -117,6 +137,11 @@ class TwitchAPI {
 
   // Get top live streams
   async getTopStreams(first: number = 20): Promise<TwitchStream[]> {
+    if (!this.isConfigured()) {
+      // Silently return empty array to allow fallback to mock data
+      return [];
+    }
+    
     try {
       const data = await this.makeRequest<{ data: TwitchStream[] }>('streams', {
         first: first.toString(),
@@ -130,6 +155,11 @@ class TwitchAPI {
 
   // Get streams by game ID
   async getStreamsByGame(gameId: string, first: number = 20): Promise<TwitchStream[]> {
+    if (!this.isConfigured()) {
+      // Silently return empty array to allow fallback to mock data
+      return [];
+    }
+    
     try {
       const data = await this.makeRequest<{ data: TwitchStream[] }>('streams', {
         game_id: gameId,
@@ -144,6 +174,11 @@ class TwitchAPI {
 
   // Get top games/categories
   async getTopGames(first: number = 20): Promise<TwitchGame[]> {
+    if (!this.isConfigured()) {
+      // Silently return empty array to allow fallback to mock data
+      return [];
+    }
+    
     try {
       const data = await this.makeRequest<{ data: TwitchGame[] }>('games/top', {
         first: first.toString(),
@@ -175,6 +210,11 @@ class TwitchAPI {
 
   // Search channels
   async searchChannels(query: string, first: number = 20): Promise<any[]> {
+    if (!this.isConfigured()) {
+      // Silently return empty array to allow fallback to mock data
+      return [];
+    }
+    
     try {
       const data = await this.makeRequest<{ data: any[] }>('search/channels', {
         query,
@@ -190,6 +230,11 @@ class TwitchAPI {
 
   // Get stream by user login
   async getStreamByUsername(username: string): Promise<TwitchStream | null> {
+    if (!this.isConfigured()) {
+      // Silently return null to allow fallback to mock data
+      return null;
+    }
+    
     try {
       const data = await this.makeRequest<{ data: TwitchStream[] }>('streams', {
         user_login: username,
@@ -203,6 +248,11 @@ class TwitchAPI {
 
   // Get stream by stream ID or user ID
   async getStreamById(id: string): Promise<TwitchStream | null> {
+    if (!this.isConfigured()) {
+      // Silently return null to allow fallback to mock data
+      return null;
+    }
+    
     try {
       // First try to get by user_id (stream ID)
       const streamData = await this.makeRequest<{ data: TwitchStream[] }>('streams', {

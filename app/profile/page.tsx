@@ -2,23 +2,42 @@
 
 import { useFavorites } from '@/hooks/useFavorites';
 import { useTheme } from '@/hooks/useTheme';
+import { useAuth } from '@/hooks/useAuth';
+import { signOut } from '@/lib/firebaseAuth';
 import ThemeToggle from '@/components/ThemeToggle';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { mockStreams } from '@/lib/mockData';
 
 export default function ProfilePage() {
   const { favorites, removeFavorite, isLoaded } = useFavorites();
   const { theme } = useTheme();
+  const { user, loading } = useAuth();
+  const router = useRouter();
 
-  // Mock user data
-  const mockUser = {
-    username: 'GameWaveUser',
-    email: 'user@gamewave.com',
-    avatar: 'https://static-cdn.jtvnw.net/jtv_user_pictures/default-profile-image-70x70.png',
-    joinedDate: 'November 2024',
+  // Format user data from Firebase
+  const formatJoinDate = (timestamp: string | null) => {
+    if (!timestamp) return 'Recently';
+    const date = new Date(timestamp);
+    return date.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
   };
 
-  if (!isLoaded) {
+  const handleLogout = async () => {
+    try {
+      await signOut();
+      router.push('/');
+    } catch (error) {
+      console.error('Logout error:', error);
+    }
+  };
+
+  // Redirect to login if not authenticated
+  if (!loading && !user) {
+    router.push('/auth/login');
+    return null;
+  }
+
+  if (!isLoaded || loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-[#9146FF]"></div>
@@ -35,40 +54,40 @@ export default function ProfilePage() {
             <div className="flex items-center space-x-6">
               <div className="relative">
                 <img
-                  src={mockUser.avatar}
-                  alt={mockUser.username}
+                  src={user?.photoURL || 'https://static-cdn.jtvnw.net/jtv_user_pictures/default-profile-image-70x70.png'}
+                  alt={user?.displayName || 'User'}
                   className="w-28 h-28 rounded-full border-4 border-[#9146FF] shadow-xl shadow-[#9146FF]/30"
                 />
                 <div className="absolute -bottom-1 -right-1 w-8 h-8 bg-green-500 border-4 border-[#18181B] rounded-full" />
               </div>
               <div>
-                <h1 className="text-3xl md:text-4xl font-bold text-white mb-2">{mockUser.username}</h1>
+                <h1 className="text-3xl md:text-4xl font-bold text-white mb-2">{user?.displayName || 'GameWave User'}</h1>
                 <p className="text-[#ADADAD] flex items-center">
                   <svg className="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
                   </svg>
-                  {mockUser.email}
+                  {user?.email || user?.phoneNumber || 'No email'}
                 </p>
                 <p className="text-[#ADADAD] text-sm mt-1.5 flex items-center">
                   <svg className="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
                   </svg>
-                  Joined {mockUser.joinedDate}
+                  Joined {formatJoinDate(user?.metadata?.creationTime || null)}
                 </p>
               </div>
             </div>
             
             <div className="flex items-center space-x-3">
               <ThemeToggle />
-              <Link
-                href="/auth/login"
+              <button
+                onClick={handleLogout}
                 className="px-6 py-2.5 bg-[#2D2D31] text-white rounded-lg font-semibold hover:bg-red-600 transition-all hover:scale-105 flex items-center space-x-2"
               >
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
                 </svg>
                 <span>Logout</span>
-              </Link>
+              </button>
             </div>
           </div>
         </div>
